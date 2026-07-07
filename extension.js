@@ -96,6 +96,30 @@ async function newCard(store, preview) {
     return;
   }
 
+  // New cards default to private: they live under `content/private/`, which the
+  // build excludes from `release` output (but still renders in dev, so the
+  // preview works). Pick "Public" to publish it under `content/` directly.
+  const visibility = await vscode.window.showQuickPick(
+    [
+      {
+        label: "$(lock) Private",
+        description: "content/private — excluded from release builds",
+        dir: path.join("content", "private"),
+      },
+      {
+        label: "$(globe) Public",
+        description: "content — published",
+        dir: "content",
+      },
+    ],
+    {
+      title: "tr: new card",
+      placeHolder: "Visibility (new cards are private by default)",
+      ignoreFocusOut: true,
+    }
+  );
+  if (!visibility) return; // cancelled (Esc)
+
   const prefix = await vscode.window.showInputBox({
     title: "tr: new card",
     prompt: "Address prefix (leave empty for none)",
@@ -122,12 +146,14 @@ async function newCard(store, preview) {
     return;
   }
 
-  const file = path.join(root, "content", `${addr}.scrbl`);
+  const dir = path.join(root, visibility.dir);
+  const file = path.join(dir, `${addr}.scrbl`);
   if (fs.existsSync(file)) {
     vscode.window.showErrorMessage(`tr: ${addr}.scrbl already exists.`);
     return;
   }
   try {
+    fs.mkdirSync(dir, { recursive: true });
     fs.writeFileSync(file, "@title{}\n", { flag: "wx" });
   } catch (e) {
     vscode.window.showErrorMessage(`tr: could not create card: ${e.message}`);

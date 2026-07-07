@@ -43,10 +43,51 @@ function addrForDocument(uri) {
   return path.basename(uri.fsPath, ".scrbl");
 }
 
+/**
+ * Map every card address in the project to the `.scrbl` file that defines it.
+ * Cards live anywhere under `content/` (including `content/private/`), but an
+ * address is just the file's basename, so the map is flat. Built once per
+ * preview render and reused, so link rewriting doesn't rescan per link.
+ */
+function cardFileMap(root) {
+  const map = new Map();
+  const stack = [path.join(root, "content")];
+  while (stack.length) {
+    const dir = stack.pop();
+    let entries;
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true });
+    } catch (_) {
+      continue;
+    }
+    for (const e of entries) {
+      const full = path.join(dir, e.name);
+      if (e.isDirectory()) stack.push(full);
+      else if (e.name.endsWith(".scrbl")) {
+        const addr = path.basename(e.name, ".scrbl");
+        if (!map.has(addr)) map.set(addr, full);
+      }
+    }
+  }
+  return map;
+}
+
+/** The `.scrbl` source file for a card address, or undefined. */
+function findCardFile(root, addr) {
+  return cardFileMap(root).get(addr);
+}
+
 function racoPath() {
   return (
     vscode.workspace.getConfiguration("tr").get("racoPath") || "raco"
   ).toString();
 }
 
-module.exports = { isTrRoot, projectRootFor, addrForDocument, racoPath };
+module.exports = {
+  isTrRoot,
+  projectRootFor,
+  addrForDocument,
+  cardFileMap,
+  findCardFile,
+  racoPath,
+};
