@@ -1,0 +1,89 @@
+{
+  "name": "tr-notes",
+  "displayName": "tr-notes",
+  "description": "Authoring support for tr-notes: card mention search, new card, and live preview.",
+  "version": "0.1.0",
+  "publisher": "dannypsnl",
+  "engines": {
+    "vscode": "^1.75.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "workspaceContains:**/site.rkt",
+    "workspaceContains:content/**/*.scrbl"
+  ],
+  "main": "./extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "scribble",
+        "aliases": [
+          "Scribble",
+          "scribble"
+        ],
+        "extensions": [
+          ".scrbl"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "commands": [
+      {
+        "command": "tr.newCard",
+        "title": "tr: New Card"
+      },
+      {
+        "command": "tr.insertMention",
+        "title": "tr: Insert Mention (card search)"
+      },
+      {
+        "command": "tr.showPreview",
+        "title": "tr: Open Preview"
+      },
+      {
+        "command": "tr.build",
+        "title": "tr: Build"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "tr.insertMention",
+        "key": "ctrl+shift+m",
+        "mac": "cmd+shift+m",
+        "when": "editorTextFocus && editorLangId == scribble"
+      },
+      {
+        "command": "tr.showPreview",
+        "key": "ctrl+shift+v",
+        "mac": "cmd+shift+v",
+        "when": "editorLangId == scribble"
+      }
+    ],
+    "menus": {
+      "editor/title": [
+        {
+          "command": "tr.showPreview",
+          "when": "editorLangId == scribble",
+          "group": "navigation"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "tr-notes",
+      "properties": {
+        "tr.racoPath": {
+          "type": "string",
+          "default": "raco",
+          "description": "Path to the `raco` executable used to run `raco tr` commands."
+        },
+        "tr.buildOnSave": {
+          "type": "boolean",
+          "default": true,
+          "description": "Run `raco tr build` when a .scrbl file is saved, so the preview stays fresh."
+        }
+      }
+    }
+  }
+}
