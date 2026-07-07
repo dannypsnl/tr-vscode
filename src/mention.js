@@ -173,4 +173,4 @@ async function insertMentionCommand(context, store) {
   await editor.edit((b) => b.replace(editor.selection, text));
 }
 
-module.exports = { makeMentionTrigger, insertMentionCommand };
+module.exports = { makeMentionTrigger, insertMentionCommand, chooseCard };

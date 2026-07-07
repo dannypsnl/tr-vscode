@@ -42,6 +42,18 @@ server-side rendered, so cards display without any client-side scripting.
 
 ![](images/2026-07-07-13-25-18.png)
 
+### 4. Open card
+
+**`tr: Open Card (card search)`** (`Cmd/Ctrl+K` while editing a card) opens the
+same card search as mention, but instead of inserting text it opens the chosen
+card's `.scrbl` file in the editor — a quick way to jump between cards by id,
+title or taxon. It shares the recently-used list with mention search, so a card
+you just linked is easy to open.
+
+> `Cmd/Ctrl+K` is a chord prefix in VSCode's defaults; this binding overrides it
+> only while a `.scrbl` editor is focused. Run the command from the Command
+> Palette to invoke it from anywhere.
+
 ## Settings
 
 | Setting          | Default | Description                                        |

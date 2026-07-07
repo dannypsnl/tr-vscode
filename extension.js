@@ -7,6 +7,7 @@ const { CardStore } = require("./src/cards");
 const { PreviewManager } = require("./src/preview");
 const { BuildManager } = require("./src/builder");
 const { makeMentionTrigger, insertMentionCommand } = require("./src/mention");
+const { openCardCommand } = require("./src/open");
 const { projectRootFor, addrForDocument, racoPath } = require("./src/util");
 
 let output;
@@ -27,6 +28,10 @@ function activate(context) {
     vscode.workspace.onDidChangeTextDocument(makeMentionTrigger(context, store)),
     vscode.commands.registerCommand("tr.insertMention", () =>
       insertMentionCommand(context, store)
+    ),
+    // Cmd+K: search cards by id/title/taxon and open the chosen `.scrbl` file.
+    vscode.commands.registerCommand("tr.openCard", () =>
+      openCardCommand(context, store)
     )
   );
 

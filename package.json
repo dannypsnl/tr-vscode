@@ -44,6 +44,10 @@
         "title": "tr: Insert Mention (card search)"
       },
       {
+        "command": "tr.openCard",
+        "title": "tr: Open Card (card search)"
+      },
+      {
         "command": "tr.showPreview",
         "title": "tr: Open Preview"
       },
@@ -57,6 +61,12 @@
         "command": "tr.insertMention",
         "key": "ctrl+shift+m",
         "mac": "cmd+shift+m",
+        "when": "editorTextFocus && editorLangId == scribble"
+      },
+      {
+        "command": "tr.openCard",
+        "key": "ctrl+k",
+        "mac": "cmd+k",
         "when": "editorTextFocus && editorLangId == scribble"
       },
       {
