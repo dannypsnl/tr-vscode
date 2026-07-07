@@ -68,7 +68,7 @@ class PreviewManager {
     this.currentAddr = addr;
 
     const buildDir = path.join(root, "_build");
-    const htmlFile = path.join(buildDir, addr, "index.html");
+    const htmlFile = htmlFileFor(buildDir, addr);
     this.panel.title = `tr: ${addr}`;
     this.panel.webview.options = {
       enableScripts: true,
@@ -88,7 +88,7 @@ class PreviewManager {
   refresh() {
     if (!this.panel || !this.currentRoot || !this.currentAddr) return;
     const buildDir = path.join(this.currentRoot, "_build");
-    const htmlFile = path.join(buildDir, this.currentAddr, "index.html");
+    const htmlFile = htmlFileFor(buildDir, this.currentAddr);
     if (fs.existsSync(htmlFile)) {
       this.panel.webview.html = this.renderHtml(buildDir, htmlFile);
     }
@@ -133,6 +133,16 @@ class PreviewManager {
     html = html.replace(/<head>/i, `<head>${csp}`);
     return html;
   }
+}
+
+/**
+ * Where a card's rendered HTML lands under `_build/`. Ordinary cards render to
+ * `_build/<addr>/index.html`; the special homepage card `index` renders to the
+ * build root as `_build/index.html`.
+ */
+function htmlFileFor(buildDir, addr) {
+  if (addr === "index") return path.join(buildDir, "index.html");
+  return path.join(buildDir, addr, "index.html");
 }
 
 function message(body) {
