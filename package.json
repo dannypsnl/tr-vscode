@@ -7,7 +7,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://codeberg.org/dannypsnl/tr-vscode.git"
+    "url": "https://github.com/dannypsnl/tr-vscode.git"
   },
   "engines": {
     "vscode": "^1.75.0"
