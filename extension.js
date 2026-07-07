@@ -5,6 +5,7 @@ const cp = require("child_process");
 
 const { CardStore } = require("./src/cards");
 const { PreviewManager } = require("./src/preview");
+const { BuildManager } = require("./src/builder");
 const { makeMentionTrigger, insertMentionCommand } = require("./src/mention");
 const { projectRootFor, addrForDocument, racoPath } = require("./src/util");
 
@@ -14,7 +15,10 @@ function activate(context) {
   output = vscode.window.createOutputChannel("tr-notes");
   const store = new CardStore();
   const preview = new PreviewManager(context);
-  context.subscriptions.push(output, { dispose: () => preview.dispose() });
+  const builder = new BuildManager({ runRaco, store, preview, output });
+  context.subscriptions.push(output, builder, {
+    dispose: () => preview.dispose(),
+  });
 
   // --- Feature 1: @mention / @mention/hidden card search -----------------
   // Typing `{` after `@mention` opens a vscode QuickPick card search (like
@@ -29,7 +33,7 @@ function activate(context) {
   // --- Feature 2: new card ----------------------------------------------
   context.subscriptions.push(
     vscode.commands.registerCommand("tr.newCard", () =>
-      newCard(store, preview)
+      newCard(store, preview, builder)
     )
   );
 
@@ -54,6 +58,30 @@ function activate(context) {
   );
 
   // --- Build integration -------------------------------------------------
+  // A single coalesced background builder keeps `_build/` fresh: saving a card,
+  // creating one, or changing a `.scrbl` on disk schedules a debounced rebuild
+  // and refreshes the preview when it lands. `tr.buildOnSave` gates the
+  // automatic rebuilds; the explicit command always builds.
+  const autoBuild = (uri) => {
+    const root = projectRootFor(uri);
+    if (!root) return;
+    const buildOnSave = vscode.workspace
+      .getConfiguration("tr")
+      .get("buildOnSave");
+    if (buildOnSave) {
+      builder.schedule(root);
+    } else {
+      store.invalidate(root);
+      preview.refresh();
+    }
+  };
+
+  // Watch every card on disk so external edits, new files, and deletions
+  // (not just saves of open editors) trigger a rebuild.
+  const watcher = vscode.workspace.createFileSystemWatcher(
+    "**/content/**/*.scrbl"
+  );
+
   context.subscriptions.push(
     vscode.commands.registerCommand("tr.build", async () => {
       const root = projectRootFor(activeResource());
@@ -61,21 +89,14 @@ function activate(context) {
         vscode.window.showErrorMessage("tr: no tr project found.");
         return;
       }
-      await runBuild(root, store, preview);
+      await builder.build(root);
     }),
-    vscode.workspace.onDidSaveTextDocument(async (doc) => {
-      if (doc.languageId !== "scribble") return;
-      const root = projectRootFor(doc.uri);
-      if (!root) return;
-      const buildOnSave = vscode.workspace
-        .getConfiguration("tr")
-        .get("buildOnSave");
-      if (buildOnSave) {
-        await runBuild(root, store, preview);
-      } else {
-        store.invalidate(root);
-        preview.refresh();
-      }
+    watcher,
+    watcher.onDidChange(autoBuild),
+    watcher.onDidCreate(autoBuild),
+    watcher.onDidDelete(autoBuild),
+    vscode.workspace.onDidSaveTextDocument((doc) => {
+      if (doc.languageId === "scribble") autoBuild(doc.uri);
     })
   );
 }
@@ -87,7 +108,7 @@ function activeResource() {
 
 // ---------------------------------------------------------------------------
 
-async function newCard(store, preview) {
+async function newCard(store, preview, builder) {
   const root = projectRootFor(activeResource());
   if (!root) {
     vscode.window.showErrorMessage(
@@ -168,6 +189,8 @@ async function newCard(store, preview) {
 
   store.invalidate(root);
   if (preview.isOpen()) preview.update(doc);
+  // Build the new card so the preview renders it (rather than "no build yet").
+  builder.schedule(root);
 }
 
 // ---------------------------------------------------------------------------
@@ -188,28 +211,6 @@ function runRaco(root, args) {
       }
     );
   });
-}
-
-async function runBuild(root, store, preview) {
-  return vscode.window.withProgress(
-    { location: vscode.ProgressLocation.Window, title: "tr: building…" },
-    async () => {
-      try {
-        const { stderr } = await runRaco(root, ["tr", "build"]);
-        if (stderr && stderr.trim()) {
-          output.appendLine(stderr.trim());
-        }
-        store.invalidate(root);
-        preview.refresh();
-      } catch (e) {
-        output.appendLine(`[build error] ${e.message}`);
-        output.show(true);
-        vscode.window.showErrorMessage(
-          "tr build failed — see the tr-notes output channel."
-        );
-      }
-    }
-  );
 }
 
 function deactivate() {}
