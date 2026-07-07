@@ -20,6 +20,8 @@ cursor (or just the address when you're already inside a mention slot).
 Card data comes from `_build/search.json` when present (produced by
 `raco tr build`); otherwise it falls back to scanning `content/**/*.scrbl`.
 
+![](images/2026-07-07-13-26-36.png)
+
 ### 2. New card
 
 **`tr: New Card`** asks for an address prefix (Enter for none), runs
@@ -38,12 +40,14 @@ The preview loads `_build/<addr>/index.html` and rewrites its absolute asset
 paths (`/style.css`, KaTeX, rendered SVGs, …) to webview URIs. Math is
 server-side rendered, so cards display without any client-side scripting.
 
+![](images/2026-07-07-13-25-18.png)
+
 ## Settings
 
-| Setting | Default | Description |
-| --- | --- | --- |
-| `tr.racoPath` | `raco` | Path to the `raco` executable. |
-| `tr.buildOnSave` | `true` | Run `raco tr build` when a `.scrbl` file is saved. |
+| Setting          | Default | Description                                        |
+| ---------------- | ------- | -------------------------------------------------- |
+| `tr.racoPath`    | `raco`  | Path to the `raco` executable.                     |
+| `tr.buildOnSave` | `true`  | Run `raco tr build` when a `.scrbl` file is saved. |
 
 ## Running it
 
