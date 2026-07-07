@@ -1,9 +1,11 @@
 name: Release VSIX
 
 # Build the extension and attach the packaged .vsix to a GitHub Release.
+# Triggered by pushing a version tag (e.g. `git push origin v0.1.0`).
 on:
-  release:
-    types: [published]
+  push:
+    tags:
+      - "v*"
 
 permissions:
   contents: write
@@ -19,9 +21,9 @@ jobs:
           node-version: 20
 
       - name: Package extension
-        run: npx --yes @vscode/vsce package -o "tr-notes-${{ github.event.release.tag_name }}.vsix"
+        run: npx --yes @vscode/vsce package -o "tr-notes-${{ github.ref_name }}.vsix"
 
-      - name: Upload VSIX to the release
+      - name: Create release and upload VSIX
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload "${{ github.event.release.tag_name }}" tr-notes-*.vsix --clobber
+        run: gh release create "${{ github.ref_name }}" tr-notes-*.vsix --title "${{ github.ref_name }}" --generate-notes
