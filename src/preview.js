@@ -1,7 +1,7 @@
 const vscode = require("vscode");
 const path = require("path");
 const fs = require("fs");
-const { projectRootFor, addrForDocument } = require("./util");
+const { projectRootFor, addrForDocument, cardFileMap } = require("./util");
 
 /**
  * Owns the single preview webview panel and keeps it in sync with the active
@@ -39,8 +39,32 @@ class PreviewManager {
       this.panel.onDidDispose(() => {
         this.panel = undefined;
       });
+      // Clicking a card link in the preview opens that card's source for
+      // editing (and re-points the preview at it) rather than navigating the
+      // built page inside the webview.
+      this.panel.webview.onDidReceiveMessage((msg) => {
+        if (msg && msg.type === "open" && msg.addr) this.openCard(msg.addr);
+      });
     }
     this.update(document, { reveal: true });
+  }
+
+  /** Open the `.scrbl` source of `addr` in the editor and preview it. */
+  async openCard(addr) {
+    if (!this.currentRoot) return;
+    const file = cardFileMap(this.currentRoot).get(addr);
+    if (!file) {
+      vscode.window.showWarningMessage(
+        `tr: no source file found for card "${addr}".`
+      );
+      return;
+    }
+    const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(file));
+    await vscode.window.showTextDocument(doc, {
+      viewColumn: vscode.ViewColumn.One,
+      preserveFocus: false,
+    });
+    this.update(doc);
   }
 
   isOpen() {
@@ -102,18 +126,27 @@ class PreviewManager {
       return message(`Failed to read build output: ${e.message}`);
     }
     const webview = this.panel.webview;
+    const root = path.dirname(buildDir);
+    const cards = cardFileMap(root);
 
     const rewrite = (match, attr, rel) => {
       // Strip query/hash, map the absolute web path onto a file in _build.
       const clean = rel.split(/[?#]/)[0];
-      if (clean === "" || clean === "/") return match; // home link, leave it
+      const addr = clean.replace(/^\/+|\/+$/g, "");
+      // A link to a card (including the home link `/` → the `index` card):
+      // forward the click to the extension so it opens the source to edit.
+      const cardAddr = addr === "" ? "index" : addr;
+      if (cards.has(cardAddr)) {
+        return `${attr}="#" data-tr-open="${cardAddr}"`;
+      }
+      if (clean === "" || clean === "/") return match; // home, no index card
       let filePath = path.join(buildDir, clean);
       try {
         const stat = fs.statSync(filePath);
         if (stat.isDirectory()) filePath = path.join(filePath, "index.html");
         else if (!stat.isFile()) return match;
       } catch (_) {
-        return match; // internal card link with no asset on disk; leave as-is
+        return match; // internal link with no asset on disk; leave as-is
       }
       const uri = webview.asWebviewUri(vscode.Uri.file(filePath));
       return `${attr}="${uri}"`;
@@ -131,6 +164,22 @@ class PreviewManager {
       `font-src ${webview.cspSource}; ` +
       `script-src ${webview.cspSource} 'unsafe-inline';">`;
     html = html.replace(/<head>/i, `<head>${csp}`);
+
+    // Forward clicks on card links (tagged with data-tr-open above) to the
+    // extension, which opens the corresponding `.scrbl` source for editing.
+    const bridge =
+      `<script>(function(){` +
+      `const vs=acquireVsCodeApi();` +
+      `document.addEventListener('click',function(e){` +
+      `const a=e.target.closest&&e.target.closest('a[data-tr-open]');` +
+      `if(!a)return;e.preventDefault();` +
+      `vs.postMessage({type:'open',addr:a.getAttribute('data-tr-open')});` +
+      `});})();</script>`;
+    if (/<\/body>/i.test(html)) {
+      html = html.replace(/<\/body>/i, `${bridge}</body>`);
+    } else {
+      html += bridge;
+    }
     return html;
   }
 }
