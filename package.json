@@ -2,7 +2,7 @@
   "name": "tr-notes",
   "displayName": "tr-notes",
   "description": "Authoring support for tr-notes: card mention search, new card, and live preview.",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "publisher": "dannypsnl",
   "license": "MIT",
   "repository": {
