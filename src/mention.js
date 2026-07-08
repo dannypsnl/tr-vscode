@@ -158,7 +158,7 @@ function firstOpenerIndex(text) {
 /**
  * Command version: open the card search from anywhere. Inserts just the address
  * when the cursor already sits in a mention slot, otherwise a full
- * `@mention{addr}`.
+ * `@mention["addr"]`.
  */
 async function insertMentionCommand(context, store) {
   const editor = vscode.window.activeTextEditor;
@@ -169,7 +169,7 @@ async function insertMentionCommand(context, store) {
   const pos = editor.selection.active;
   const prefix = editor.document.lineAt(pos.line).text.slice(0, pos.character);
   const inSlot = ADDR_SLOT.test(prefix);
-  const text = inSlot ? id : `@mention{${id}}`;
+  const text = inSlot ? id : `@mention["${id}"]`;
   await editor.edit((b) => b.replace(editor.selection, text));
 }
 
