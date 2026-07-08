@@ -141,14 +141,24 @@ class PreviewManager {
       }
       if (clean === "" || clean === "/") return match; // home, no index card
       let filePath = path.join(buildDir, clean);
+      let mtime;
       try {
-        const stat = fs.statSync(filePath);
-        if (stat.isDirectory()) filePath = path.join(filePath, "index.html");
-        else if (!stat.isFile()) return match;
+        let stat = fs.statSync(filePath);
+        if (stat.isDirectory()) {
+          filePath = path.join(filePath, "index.html");
+          stat = fs.statSync(filePath);
+        }
+        if (!stat.isFile()) return match;
+        mtime = stat.mtimeMs;
       } catch (_) {
         return match; // internal link with no asset on disk; leave as-is
       }
-      const uri = webview.asWebviewUri(vscode.Uri.file(filePath));
+      // The webview caches resources by URI, so a rebuilt asset that keeps its
+      // filename (a card's `tex*.svg`, say) would serve stale from cache. Bust
+      // it with the file's mtime so the URI changes whenever the file does.
+      const uri = webview
+        .asWebviewUri(vscode.Uri.file(filePath))
+        .with({ query: `v=${Math.round(mtime)}` });
       return `${attr}="${uri}"`;
     };
 
