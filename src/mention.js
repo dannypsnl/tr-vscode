@@ -1,15 +1,18 @@
 const vscode = require("vscode");
 const { projectRootFor } = require("./util");
 
-// Cursor is in a mention *address* slot when the text before it is one of:
+// Cursor is in a card-*address* slot when the text before it is one of:
 //   @mention{<addr>            @mention/hidden{<addr>
 //   @mention["<addr>           @mention/hidden["<addr>
-// The `["addr"]{link text}` body slot is intentionally NOT matched.
-const ADDR_SLOT = /@mention(?:\/hidden)?\s*(?:\[\s*"|\{)([^"}\]]*)$/;
+//   @transclude{<addr>
+// `@transclude` takes a card address just like `@mention`, so it gets the same
+// picker.
+const TAG = /@(?:mention(?:\/hidden)?|transclude)/.source;
+const ADDR_SLOT = new RegExp(`${TAG}\\s*(?:\\[\\s*"|\\{)([^"}\\]]*)$`);
 
 // Detects the moment an address slot is *opened* by typing `{` or `"`, so we can
 // pop the card picker (like vscode-violet pops its QuickPick on `\`).
-const JUST_OPENED = /@mention(?:\/hidden)?(?:\[\s*"|\{)$/;
+const JUST_OPENED = new RegExp(`${TAG}(?:\\[\\s*"|\\{)$`);
 
 const RECENTS_KEY = "tr.mentionRecents";
 const RECENTS_MAX = 8;
