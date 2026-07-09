@@ -20,6 +20,9 @@ class PreviewManager {
     this.panel = undefined;
     this.currentRoot = undefined;
     this.currentAddr = undefined;
+    // For back/forward in the preview history
+    this.history = [];
+    this.historyIndex = -1;
   }
 
   dispose() {
@@ -43,7 +46,9 @@ class PreviewManager {
       // editing (and re-points the preview at it) rather than navigating the
       // built page inside the webview.
       this.panel.webview.onDidReceiveMessage((msg) => {
-        if (msg && msg.type === "open" && msg.addr) this.openCard(msg.addr);
+        if (!msg) return;
+        if (msg.type === "open" && msg.addr) this.openCard(msg.addr);
+        else if (msg.type === "nav" && msg.dir) this.navigate(msg.dir);
       });
     }
     this.update(document, { reveal: true });
@@ -65,6 +70,30 @@ class PreviewManager {
       preserveFocus: false,
     });
     this.update(doc);
+  }
+
+  /**
+   * Note that the preview now shows `addr`. A no-op when it's already the
+   * current entry (re-render/rebuild, or the update triggered by our own
+   * back/forward), so those don't pollute the trail. Any other addr starts a
+   * new branch: forward history is dropped and the addr is appended.
+   */
+  recordHistory(addr) {
+    if (this.history[this.historyIndex] === addr) return;
+    this.history = this.history.slice(0, this.historyIndex + 1);
+    this.history.push(addr);
+    this.historyIndex = this.history.length - 1;
+  }
+
+  /** Step back/forward through the visited-card trail. */
+  navigate(dir) {
+    const next = this.historyIndex + (dir === "back" ? -1 : 1);
+    if (next < 0 || next >= this.history.length) return;
+    this.historyIndex = next;
+    // openCard → update → recordHistory, which no-ops since the target addr is
+    // already the current entry. Scroll position is restored per-addr by the
+    // in-page script, so returning to a card lands where you left it.
+    this.openCard(this.history[next]);
   }
 
   isOpen() {
@@ -90,6 +119,7 @@ class PreviewManager {
 
     this.currentRoot = root;
     this.currentAddr = addr;
+    this.recordHistory(addr);
 
     const buildDir = path.join(root, "_build");
     const htmlFile = htmlFileFor(buildDir, addr);
@@ -179,6 +209,31 @@ class PreviewManager {
       `script-src ${webview.cspSource} 'unsafe-inline';">`;
     html = html.replace(/<head>/i, `<head>${csp}`);
 
+    // A floating back/forward toolbar for the visited-card trail. Disabled at
+    // the ends; clicks post a `nav` message the extension turns into
+    // history steps. Sits above the card content in the top-right corner.
+    const canBack = this.historyIndex > 0;
+    const canForward = this.historyIndex < this.history.length - 1;
+    const navBar =
+      `<style>` +
+      `#tr-nav{position:fixed;top:8px;right:8px;z-index:2147483647;display:flex;gap:4px;}` +
+      `#tr-nav button{cursor:pointer;width:26px;height:24px;font-size:13px;line-height:1;` +
+      `border:1px solid var(--vscode-panel-border,transparent);border-radius:4px;opacity:.85;` +
+      `background:var(--vscode-button-secondaryBackground,rgba(128,128,128,.2));` +
+      `color:var(--vscode-button-secondaryForeground,var(--vscode-foreground));}` +
+      `#tr-nav button:hover:not(:disabled){opacity:1;}` +
+      `#tr-nav button:disabled{opacity:.35;cursor:default;}` +
+      `</style>` +
+      `<div id="tr-nav">` +
+      `<button id="tr-back" title="Back"${canBack ? "" : " disabled"}>&#8592;</button>` +
+      `<button id="tr-fwd" title="Forward"${canForward ? "" : " disabled"}>&#8594;</button>` +
+      `</div>`;
+    if (/<body[^>]*>/i.test(html)) {
+      html = html.replace(/(<body[^>]*>)/i, `$1${navBar}`);
+    } else {
+      html = navBar + html;
+    }
+
     // Forward clicks on card links (tagged with data-tr-open above) to the
     // extension, which opens the corresponding `.scrbl` source for editing.
     //
@@ -199,6 +254,10 @@ class PreviewManager {
       `const m=scrollMap();m[ADDR]=window.scrollY;` +
       `vs.setState(Object.assign({},vs.getState(),{scroll:m}));` +
       `},100);},{passive:true});` +
+      `const back=document.getElementById('tr-back');` +
+      `const fwd=document.getElementById('tr-fwd');` +
+      `if(back)back.addEventListener('click',function(){vs.postMessage({type:'nav',dir:'back'});});` +
+      `if(fwd)fwd.addEventListener('click',function(){vs.postMessage({type:'nav',dir:'forward'});});` +
       `document.addEventListener('click',function(e){` +
       `const a=e.target.closest&&e.target.closest('a[data-tr-open]');` +
       `if(!a)return;e.preventDefault();` +
