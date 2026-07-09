@@ -105,7 +105,7 @@ class PreviewManager {
       );
       return;
     }
-    this.panel.webview.html = this.renderHtml(buildDir, htmlFile);
+    this.panel.webview.html = this.renderHtml(buildDir, htmlFile, addr);
   }
 
   /** Re-render whatever card is currently bound (used after a build). */
@@ -114,11 +114,15 @@ class PreviewManager {
     const buildDir = path.join(this.currentRoot, "_build");
     const htmlFile = htmlFileFor(buildDir, this.currentAddr);
     if (fs.existsSync(htmlFile)) {
-      this.panel.webview.html = this.renderHtml(buildDir, htmlFile);
+      this.panel.webview.html = this.renderHtml(
+        buildDir,
+        htmlFile,
+        this.currentAddr
+      );
     }
   }
 
-  renderHtml(buildDir, htmlFile) {
+  renderHtml(buildDir, htmlFile, addr) {
     let html;
     try {
       html = fs.readFileSync(htmlFile, "utf8");
@@ -177,9 +181,24 @@ class PreviewManager {
 
     // Forward clicks on card links (tagged with data-tr-open above) to the
     // extension, which opens the corresponding `.scrbl` source for editing.
+    //
+    // Setting `webview.html` reloads the page, so navigating between cards (or
+    // rebuilding the current one) would otherwise reset the scroll back to the
+    // top. Persist the scroll offset per addr in the webview's own state — it
+    // survives html reloads within the panel — and restore it on load, so
+    // returning to a card lands where you left it.
     const bridge =
       `<script>(function(){` +
       `const vs=acquireVsCodeApi();` +
+      `const ADDR=${JSON.stringify(addr)};` +
+      `function scrollMap(){const s=vs.getState();return (s&&s.scroll)||{};}` +
+      `function restore(){const y=scrollMap()[ADDR];if(typeof y==='number')window.scrollTo(0,y);}` +
+      `restore();window.addEventListener('load',restore);` +
+      `let t;window.addEventListener('scroll',function(){` +
+      `clearTimeout(t);t=setTimeout(function(){` +
+      `const m=scrollMap();m[ADDR]=window.scrollY;` +
+      `vs.setState(Object.assign({},vs.getState(),{scroll:m}));` +
+      `},100);},{passive:true});` +
       `document.addEventListener('click',function(e){` +
       `const a=e.target.closest&&e.target.closest('a[data-tr-open]');` +
       `if(!a)return;e.preventDefault();` +
